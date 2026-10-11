@@ -9,9 +9,22 @@ import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
  */
 export const validated = (expectedType: Type) => new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true, expectedType });
 
+/**
+ * The browser sends `Origin: https://host` (no slash, no path) and CORS compares
+ * it exactly, so `host/` or `https://host/` in WEB_ORIGIN would block the site
+ * without a word. Read every entry as an origin.
+ */
+const asOrigin = (s: string) => {
+  try {
+    return new URL(/^https?:\/\//i.test(s) ? s : `https://${s}`).origin;
+  } catch {
+    return s;
+  }
+};
+
 /** Shared by main.ts and the tests, so they run the same app. */
 export function configure(app: INestApplication) {
-  const origins = (process.env.WEB_ORIGIN ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  const origins = (process.env.WEB_ORIGIN ?? "").split(",").map((s) => s.trim()).filter(Boolean).map(asOrigin);
   app.enableCors({ origin: origins.length ? origins : true, methods: ["GET", "POST"] });
   const doc = SwaggerModule.createDocument(
     app,

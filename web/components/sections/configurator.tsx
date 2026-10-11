@@ -104,8 +104,16 @@ export function Configurator() {
           </div>
 
           <div className="mt-6 flex items-end justify-between gap-4 border-t border-line pt-5">
-            <div>
-              <p className="font-mono text-[0.66rem] tracking-[0.16em] text-mist uppercase">Your Q-01</p>
+            <div className="flex-1">
+              <div className="flex items-center justify-between gap-3">
+                <p className="font-mono text-[0.66rem] tracking-[0.16em] text-mist uppercase">Your Q-01</p>
+                {q && (
+                  <p className="flex items-center gap-2 font-mono text-[0.62rem] tracking-[0.14em] text-mist uppercase" data-quote-source={q.source}>
+                    <span aria-hidden="true" className={cn("size-1.5 rounded-full", q.source === "api" ? "bg-gold shadow-[0_0_8px_var(--gold)]" : "border border-mist/60")} />
+                    {q.source === "api" ? "Priced live by the atelier" : "Estimated in your browser"}
+                  </p>
+                )}
+              </div>
               <p className="num mt-1 text-[1.7rem] leading-none text-ivory">{usd(price)}</p>
               <p className="mt-2 text-[0.8rem] text-mist">{lead ? `Assembled and regulated in ${lead[0]}–${lead[1]} weeks` : "Assembled and regulated by hand"}</p>
             </div>

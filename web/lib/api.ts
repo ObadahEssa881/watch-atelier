@@ -4,8 +4,23 @@ import { priceOf, type Build } from "./catalogue";
  * The atelier's API (NestJS, in `api/`). Set NEXT_PUBLIC_API_URL to its
  * address. Every call falls back gracefully: prices are computed locally,
  * and a reservation reports honestly that the booking service is offline.
+ *
+ * NEXT_PUBLIC_ variables are written into the bundle at build time: after
+ * setting or changing it on Vercel, the site has to be redeployed.
  */
-const BASE = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
+const RAW = (process.env.NEXT_PUBLIC_API_URL ?? "").trim().replace(/\/+$/, "");
+// without a scheme, fetch would treat "api.example.com" as a path on this site
+const BASE = !RAW || /^https?:\/\//i.test(RAW) ? RAW : `https://${RAW}`;
+
+/** Says once, in the console, why prices are not coming from the API. */
+let explained = false;
+function explain(why: string) {
+  if (explained) return;
+  explained = true;
+  console.warn(`[atelier] ${why} Prices are computed in the browser meanwhile.`);
+}
+const unreachable = () =>
+  `The API at ${BASE} did not answer this site (${location.origin}). Open ${BASE}/ in a tab: if it does not show {"status":"ok"}, the API is not deployed or Vercel Deployment Protection is on; if it does, WEB_ORIGIN on the API must be ${location.origin} — then redeploy the API.`;
 
 export interface Quote {
   price: number;
@@ -24,10 +39,12 @@ export async function quote(b: Build, signal?: AbortSignal): Promise<Quote> {
         const j = (await r.json()) as Omit<Quote, "source">;
         return { ...j, source: "api" };
       }
+      explain(`The API at ${BASE} answered ${r.status} to POST /quotes — is NEXT_PUBLIC_API_URL the API project's address, not the site's?`);
     } catch (e) {
       if ((e as Error).name === "AbortError") throw e;
+      explain(unreachable());
     }
-  }
+  } else explain("NEXT_PUBLIC_API_URL was empty when this site was built. Set it on the web project in Vercel, then redeploy it.");
   return { price: priceOf(b), currency: "USD", leadWeeks: localLead(b), source: "local" };
 }
 

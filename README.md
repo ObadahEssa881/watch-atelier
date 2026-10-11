@@ -63,6 +63,23 @@ Checks: `cd web && npm run lint && npm run typecheck && npm run build` · `cd ap
 The site works without the API (prices are computed locally and the reservation dialog says the
 booking service is offline); with it, prices and reservations come from the server.
 
+### Are they connected?
+
+Under the price in the configurator: **● Priced live by the atelier** means the API answered;
+**○ Estimated in your browser** means it did not, and the browser console says why (`[atelier] …`).
+
+- **Redeploy after changing a variable.** Vercel applies environment variables only to new
+  deployments, and `NEXT_PUBLIC_API_URL` is written into the site's JavaScript at build time.
+  Tick the *Production* environment when you add it.
+- **Use the production address, not a deployment's.** The `…-<hash>-<team>.vercel.app` address
+  on a deployment's page is behind Vercel Authentication, which a browser on another site cannot
+  pass. Use the address under *Domains* (e.g. `https://watch-atelier-api.vercel.app`), or turn off
+  *Settings → Deployment Protection* on the API project.
+- **Check the API alone:** `https://<api>/` should answer `{"service":"qasioun-api","status":"ok"}`,
+  and `https://<api>/docs` shows the Swagger page.
+- `WEB_ORIGIN` may be written with or without `https://` and a trailing slash; it must name the
+  site's own address. Separate several with commas.
+
 Reservations are kept in memory — honest for a concept, and on a serverless host each instance
 keeps its own short list. For real bookings, swap `ReservationsService`'s store for Postgres; the
 controller and DTOs stay as they are.

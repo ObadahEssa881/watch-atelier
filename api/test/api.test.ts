@@ -45,6 +45,20 @@ test("a reservation is priced by the server and can be looked up without exposin
   await a.close();
 });
 
+test("WEB_ORIGIN is read as an origin, however it was typed", async () => {
+  const site = "https://watch-atelier-a2vq.vercel.app";
+  for (const typed of ["watch-atelier-a2vq.vercel.app/", `${site}/`, ` ${site} `]) {
+    process.env.WEB_ORIGIN = `http://localhost:3000, ${typed}`;
+    const a = await app();
+    const r = await request(a.getHttpServer()).options("/quotes").set("Origin", site).set("Access-Control-Request-Method", "POST").set("Access-Control-Request-Headers", "content-type");
+    assert.equal(r.headers["access-control-allow-origin"], site, `WEB_ORIGIN=${typed}`);
+    const other = await request(a.getHttpServer()).options("/quotes").set("Origin", "https://elsewhere.example").set("Access-Control-Request-Method", "POST");
+    assert.equal(other.headers["access-control-allow-origin"], undefined);
+    await a.close();
+  }
+  delete process.env.WEB_ORIGIN;
+});
+
 test("reservations are rate limited", async () => {
   const a = await app();
   const s = a.getHttpServer();
