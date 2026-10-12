@@ -10,7 +10,7 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default: "bg-primary text-primary-foreground hover:bg-[color-mix(in_srgb,var(--gold),white_16%)]",
-        outline: "border border-border bg-ink/40 text-foreground backdrop-blur-sm hover:border-gold/50 hover:bg-accent",
+        outline: "border border-border bg-ink/60 text-foreground hover:border-gold/50 hover:bg-accent",
         secondary: "bg-secondary text-secondary-foreground hover:bg-accent",
         ghost: "text-foreground hover:bg-accent",
         link: "text-primary underline-offset-4 hover:underline",

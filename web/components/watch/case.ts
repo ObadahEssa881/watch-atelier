@@ -25,7 +25,6 @@ export function buildCase(THREE: typeof ThreeNS, kit: Kit, m: Materials, display
   group.name = "watch";
   const mesh = (geo: ThreeNS.BufferGeometry, mat: ThreeNS.Material | ThreeNS.Material[], parent: ThreeNS.Object3D = group, shadow = true) => {
     const o = new THREE.Mesh(geo, mat);
-    if (mat === m.sapphire) o.userData.glass = true;
     o.castShadow = shadow;
     o.receiveShadow = true;
     parent.add(o);
@@ -51,7 +50,9 @@ export function buildCase(THREE: typeof ThreeNS, kit: Kit, m: Materials, display
     ),
     polished,
   );
-  // case flank: brushed vertically, crisp polished chamfers top and bottom
+  // case flank: brushed vertically, crisp polished chamfers top and bottom.
+  // Its inner wall steps out just under the rehaut, so it never pokes up
+  // through it into the space under the crystal.
   mesh(
     kit.lathe(
       [
@@ -60,7 +61,9 @@ export function buildCase(THREE: typeof ThreeNS, kit: Kit, m: Materials, display
         [20.0, -3.4],
         [19.92, -3.55],
         [17.0, -3.55],
-        [17.0, 2.75],
+        [17.0, 2.1],
+        [17.4, 2.1],
+        [17.4, 2.75],
         [19.95, 2.75],
       ],
       192,
@@ -157,7 +160,7 @@ export function buildCase(THREE: typeof ThreeNS, kit: Kit, m: Materials, display
   drawBack("");
 
   // sapphire caseback window
-  mesh(
+  const backGlass = mesh(
     kit.lathe(
       [
         [0, -5.82],
@@ -241,6 +244,10 @@ export function buildCase(THREE: typeof ThreeNS, kit: Kit, m: Materials, display
   /* ---- dial --------------------------------------------------------------- */
   const dialGroup = new THREE.Group();
   group.add(dialGroup);
+  // what sits on the dial's face: print, indices, hands — none of it can be
+  // seen from behind the dial, so it is hidden as one when the back is shown
+  const face = new THREE.Group();
+  dialGroup.add(face);
   {
     const disc = new THREE.CylinderGeometry(DIAL_R, DIAL_R, 0.3, 192, 1);
     disc.rotateX(Math.PI / 2);
@@ -252,7 +259,10 @@ export function buildCase(THREE: typeof ThreeNS, kit: Kit, m: Materials, display
     mesh(disc, m.dial, dialGroup, false);
   }
   // rehaut: the inner flange between dial and crystal, matte in the dial colour
-  const rehaut = new THREE.MeshStandardMaterial({ color: DIALS.ink.color, roughness: 0.7, metalness: 0.2 });
+  // seen from both sides: its slope from the dial side (one-sided, the slope
+  // faced away there and the case wall showed through), its underside from
+  // behind when the caseback is off
+  const rehaut = new THREE.MeshStandardMaterial({ color: DIALS.ink.color, roughness: 0.7, metalness: 0.2, side: THREE.DoubleSide });
   mesh(
     kit.lathe(
       [
@@ -273,13 +283,12 @@ export function buildCase(THREE: typeof ThreeNS, kit: Kit, m: Materials, display
   const printTex = new THREE.CanvasTexture(printCanvas);
   printTex.anisotropy = 8;
   printTex.colorSpace = THREE.SRGBColorSpace;
-  // alpha-tested, not transparent: a transmissive crystal only refracts what is
-  // drawn in the opaque pass, so transparent print would vanish under the glass
+  // alpha-tested, not transparent: drawn with the opaque parts, before the crystal
   const printMat = new THREE.MeshStandardMaterial({ map: printTex, roughness: 0.55, metalness: 0, alphaTest: 0.35 });
   const print = new THREE.Mesh(new THREE.CircleGeometry(DIAL_R, 128), printMat);
   print.position.z = DIAL_Z + 0.004;
   print.receiveShadow = true;
-  dialGroup.add(print);
+  face.add(print);
   const drawPrint = (dial: DialId) => {
     const g = printCanvas.getContext("2d")!;
     const S = 2048 / (2 * DIAL_R);
@@ -326,7 +335,7 @@ export function buildCase(THREE: typeof ThreeNS, kit: Kit, m: Materials, display
       const a = (i / 12) * Math.PI * 2;
       const pairs = i === 0 ? [-0.62, 0.62] : [0];
       for (const off of pairs) {
-        const o = mesh(geo, hands, dialGroup);
+        const o = mesh(geo, hands, face);
         o.rotation.z = -a + Math.PI; // point toward the centre
         o.position.set(Math.sin(a) * 15.6 + Math.cos(a) * off, Math.cos(a) * 15.6 - Math.sin(a) * off, DIAL_Z);
       }
@@ -361,7 +370,7 @@ export function buildCase(THREE: typeof ThreeNS, kit: Kit, m: Materials, display
   hourHand.position.z = DIAL_Z + 0.25;
   minuteHand.position.z = DIAL_Z + 0.5;
   secondsHand.position.z = DIAL_Z + 0.78;
-  dialGroup.add(hourHand, minuteHand, secondsHand);
+  face.add(hourHand, minuteHand, secondsHand);
   mesh(dauphine(10.2, 1.5, 1.6, 0.26), hands, hourHand);
   mesh(dauphine(15.3, 1.25, 1.9, 0.24), hands, minuteHand);
   mesh(kit.ring(0, 1.05, 0, 0.22), hands, hourHand);
@@ -378,7 +387,7 @@ export function buildCase(THREE: typeof ThreeNS, kit: Kit, m: Materials, display
   }
 
   /* ---- box sapphire crystal --------------------------------------------- */
-  mesh(
+  const crystal = mesh(
     kit.lathe(
       [
         [0, 4.38],
@@ -491,6 +500,9 @@ export function buildCase(THREE: typeof ThreeNS, kit: Kit, m: Materials, display
   return {
     group,
     back,
+    face,
+    crystal,
+    backGlass,
     hands: { hour: hourHand, minute: minuteHand, seconds: secondsHand },
     drawPrint,
     drawBack,

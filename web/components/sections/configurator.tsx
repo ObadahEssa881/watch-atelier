@@ -69,7 +69,7 @@ export function Configurator() {
   return (
     <section id="configure" aria-labelledby="configure-t" className="relative min-h-[170svh]">
       <div className="wrap-x pt-[46svh] md:sticky md:top-0 md:flex md:min-h-[100svh] md:items-center md:pt-0">
-        <div className="w-full max-w-[29rem] rounded-sm border border-line/80 bg-ink/80 p-6 backdrop-blur-md md:mt-10 md:max-h-[calc(100svh-6.5rem)] md:overflow-y-auto md:p-7">
+        <div className="w-full max-w-[29rem] rounded-sm border border-line/80 bg-ink/90 p-6 md:mt-10 md:max-h-[calc(100svh-6.5rem)] md:overflow-y-auto md:p-7">
           <p className="eyebrow text-gold">Configure</p>
           <h2 id="configure-t" className="mt-3 font-display text-[clamp(2rem,3.2vw,2.7rem)] leading-[1.02] font-light">
             Make it yours.

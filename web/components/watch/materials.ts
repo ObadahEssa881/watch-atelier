@@ -112,16 +112,15 @@ export function makeMaterials(THREE: typeof ThreeNS, maps: Maps) {
     iridescenceThicknessRange: [260, 420],
     envMapIntensity: 1.25,
   });
-  // Synthetic ruby: corundum, n ≈ 1.77, deep red through its thickness.
+  // Synthetic ruby: corundum, n ≈ 1.77. Drawn opaque, deep red with a glow
+  // from within: a jewel this small reads by its colour and its highlight,
+  // and real transmission makes three render the whole scene a second time.
   const ruby = M({
-    color: "#c2142f",
+    color: "#a8102c",
+    emissive: "#3c030e",
     metalness: 0,
     roughness: 0.03,
-    transmission: 0.55,
-    thickness: 0.35,
     ior: 1.77,
-    attenuationColor: new THREE.Color("#8a0718"),
-    attenuationDistance: 0.25,
     clearcoat: 1,
     clearcoatRoughness: 0.02,
     specularIntensity: 1,
@@ -129,7 +128,7 @@ export function makeMaterials(THREE: typeof ThreeNS, maps: Maps) {
   });
   const hairspring = M({ color: "#b8c2d4", metalness: 1, roughness: 0.18, side: THREE.DoubleSide });
   const mainspring = M({ color: "#6f7a8c", metalness: 1, roughness: 0.3, side: THREE.DoubleSide });
-  // alpha-tested, not transparent, so it still shows through sapphire (see case.ts)
+  // alpha-tested, not transparent: drawn with the opaque parts, before the glass
   const engraving = new THREE.MeshStandardMaterial({ color: "#d9b06a", metalness: 1, roughness: 0.35, alphaTest: 0.35 });
   const dark = new THREE.MeshStandardMaterial({ color: "#16181b", metalness: 0.6, roughness: 0.5 });
 
@@ -159,13 +158,15 @@ export function makeMaterials(THREE: typeof ThreeNS, maps: Maps) {
   };
 
   // Box sapphire: n ≈ 1.77, clear, anti-reflective coating read as a faint
-  // blue-violet bloom at grazing angles (iridescence).
+  // blue-violet bloom at grazing angles (iridescence). What the eye sees of an
+  // AR-coated crystal is its reflection laid over the dial, so that is how it
+  // is drawn: a black body that only reflects, added on top. Transmission
+  // would refract a millimetre of flat glass — invisible — at the price of a
+  // second render of the whole scene every frame.
   const sapphire = M({
-    color: "#ffffff",
+    color: "#000000",
     metalness: 0,
     roughness: 0,
-    transmission: 1,
-    thickness: 1.2,
     ior: 1.77,
     // anti-reflective coated: most of the crystal's reflection is gone
     iridescence: 0.14,
@@ -173,6 +174,9 @@ export function makeMaterials(THREE: typeof ThreeNS, maps: Maps) {
     iridescenceThicknessRange: [180, 340],
     specularIntensity: 0.22,
     envMapIntensity: 1,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
   });
 
   const dial = M({

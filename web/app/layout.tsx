@@ -38,7 +38,6 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <StageStatus />
         <MotionProvider />
         <ServiceWorker />
-        <div className="grain" aria-hidden="true" />
       </body>
     </html>
   );

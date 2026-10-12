@@ -541,6 +541,8 @@ export function buildMovement(THREE: typeof ThreeNS, kit: Kit, m: Materials, dis
     group,
     anchors,
     layers: L,
+    /** Everything that moves, lifts off or changes shape: never merged across. */
+    live: [...Object.values(L), cover, ...Object.values(train), pallet, balance, rotorSpin, ...reverser, hairMesh] as ThreeNS.Object3D[],
     /** Lifts each layer of the movement toward the viewer, 0 → in place. */
     explode(e: Explode) {
       // a watchmaker lifts each part and sets it aside on the bench: up first,

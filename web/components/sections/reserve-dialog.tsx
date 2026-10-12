@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { reserve, type ReservationResult } from "@/lib/api";
 import { buildStore, useBuild } from "@/lib/build-store";
 import { cases, dials, priceOf, straps, usd } from "@/lib/catalogue";
+import { stage } from "@/lib/stage-store";
 
 export function ReserveDialog({ children }: { children: ReactNode }) {
   const b = useBuild();
@@ -18,7 +19,14 @@ export function ReserveDialog({ children }: { children: ReactNode }) {
   const summary = [cases.find((c) => c.id === b.case)?.name, `${dials.find((d) => d.id === b.dial)?.name} dial`, straps.find((s) => s.id === b.strap)?.name, b.engraving.trim() && `“${b.engraving.trim()}”`].filter(Boolean).join(" · ");
 
   return (
-    <Dialog onOpenChange={(open) => !open && setResult(null)}>
+    <Dialog
+      onOpenChange={(open) => {
+        // the watch holds still under the frosted overlay: blurring a canvas
+        // that changes every frame is one of the costliest things a page can do
+        stage.set({ held: open });
+        if (!open) setResult(null);
+      }}
+    >
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent>
         {result?.ok ? (

@@ -17,7 +17,7 @@ export function Chapters() {
       {chapters.map((c) => (
         <article key={c.id} id={c.id} data-chapter={c.id} aria-labelledby={`${c.id}-t`} className="relative min-h-[165svh]">
           <div className="wrap-x pt-[52svh] md:sticky md:top-0 md:flex md:min-h-[100svh] md:items-center md:pt-0">
-            <div className="relative max-w-[28rem] rounded-sm border border-line/80 bg-ink/72 p-7 backdrop-blur-md md:p-9">
+            <div className="relative max-w-[28rem] rounded-sm border border-line/80 bg-ink/85 p-7 md:p-9">
               <p className="flex items-center gap-4 font-mono text-[0.68rem] tracking-[0.22em] text-gold uppercase">
                 <span>{c.index}</span>
                 <span data-draw className="hairline block w-16" />

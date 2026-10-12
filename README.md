@@ -32,7 +32,10 @@ yours in the configurator.
 - **Finishes are generated in a Web Worker** (Côtes de Genève, perlage, sunburst, brushing, leather, circular graining) so scrolling never stutters while they are made, then **stored in IndexedDB** — a repeat visit decodes them in ~0.3 s instead of regenerating them. (IndexedDB, not localStorage: localStorage holds only ~5 MB of strings and blocks the main thread on every read.)
 - **A service worker** (`web/public/sw.js`) keeps the site's files in the browser: hashed scripts, the three.js chunk and fonts cache-first; images stale-while-revalidate; pages network-first with an offline fallback.
 - **three.js is its own chunk**, fetched after the page paints; the hero shows a photograph of the first frame meanwhile, and every shader is compiled before the 3D fades in.
-- **Adaptive quality**: if frames run long the pixel ratio steps down, then ambient occlusion switches off; with headroom it steps back up. Nothing renders while the tab is hidden or the stage is scrolled away.
+- **The watch is drawn once a frame.** Ambient occlusion and depth of field read that one render's depth instead of drawing the watch again; AO runs at half resolution, and the lens blurs only what is out of focus. The sapphire is drawn as its reflection — what an anti-reflective crystal shows — so three.js never renders the scene a second time for transmission.
+- **Only what the lens can see.** From the dial side a closed case seals the movement in; from the back the dial's face is behind the dial. Whichever half cannot be seen is skipped, by the shadow map too, and parts that never move against their bridge (screws, jewels, indices) are merged into one mesh per material. The hero went from 1,207 draw calls to 56.
+- **A pixel budget and a governor.** The canvas holds about 3 million pixels whatever the screen's density. If the real frame rate — GPU included — drops below ~49 fps, the governor gives up resolution, then AO, then antialiasing samples, one step at a time; a step that does not help (a display capped at 30 Hz) is taken back. No step recompiles a shader.
+- **Nothing blurred or blended over moving 3D**: the cards are solid ink, and the watch holds still under the reservation dialog's frosted overlay. Nothing renders while the tab is hidden or the stage is scrolled away.
 - **Lenis** with a slower, heavier glide; GSAP reveals that only animate *to* the visible state.
 - **Reduced motion** gets still photographs of every chapter instead of the 3D, and no smooth scroll.
 
@@ -50,7 +53,7 @@ cd api && npm install && npm run build && WEB_ORIGIN=http://localhost:3000 PORT=
 cd web && npm install && NEXT_PUBLIC_API_URL=http://localhost:3001 npm run dev
 ```
 
-Checks: `cd web && npm run lint && npm run typecheck && npm run build` · `cd api && npm run typecheck && npm test`
+Checks: `cd web && npm run lint && npm run typecheck && npm test && npm run build` · `cd api && npm run typecheck && npm test`
 
 ## Deploy on Vercel (two projects from this one repo)
 

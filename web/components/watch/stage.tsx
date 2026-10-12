@@ -6,6 +6,7 @@ import { buildStore } from "@/lib/build-store";
 import { stage } from "@/lib/stage-store";
 import { tick } from "@/lib/tick";
 import { createChoreo } from "./choreo";
+import { createGovernor } from "./governor";
 import type { Quality, WatchScene } from "./scene";
 
 /**
@@ -17,10 +18,31 @@ import type { Quality, WatchScene } from "./scene";
  *  - finishes are generated in a worker and cached in IndexedDB (textures.ts).
  *  - every shader is compiled before the first frame is shown, so the first
  *    scroll never stalls on a compile.
- *  - resolution adapts: if frames run long the pixel ratio steps down, then
- *    ambient occlusion switches off; if there is headroom it steps back up.
+ *  - resolution is a budget of pixels, not the screen's density: every
+ *    effect costs per pixel, so the canvas holds about 3 million of them
+ *    whatever the screen. It never starts below one per CSS pixel.
+ *  - the governor (governor.ts) watches the real frame rate and, if it
+ *    drops, gives up resolution, then ambient occlusion, then more
+ *    resolution and antialiasing samples — a step at a time, never a shader
+ *    recompile.
  *  - nothing renders while the tab is hidden or the stage is scrolled away.
  */
+
+const PIXELS = { desktop: 3.2e6, phone: 0.8e6 };
+const LADDER: Record<"desktop" | "phone", (Quality & { scale: number })[]> = {
+  desktop: [
+    { scale: 1, ao: true, msaa: 4 },
+    { scale: 0.85, ao: true, msaa: 4 },
+    { scale: 0.85, ao: false, msaa: 4 },
+    { scale: 0.7, ao: false, msaa: 4 },
+    { scale: 0.6, ao: false, msaa: 2 },
+  ],
+  phone: [
+    { scale: 1, ao: false, msaa: 4 },
+    { scale: 0.85, ao: false, msaa: 4 },
+    { scale: 0.7, ao: false, msaa: 2 },
+  ],
+};
 
 export function Stage() {
   const host = useRef<HTMLDivElement | null>(null);
@@ -43,27 +65,32 @@ export function Stage() {
       const [THREE, sceneMod, texMod] = await Promise.all([import("three"), import("./scene"), import("./textures")]);
       if (disposed) return;
       const phone = window.matchMedia("(max-width: 900px)").matches;
-      const maxPr = Math.min(window.devicePixelRatio || 1, phone ? 2 : 2);
-      let pr = Math.min(maxPr, phone ? 1.5 : 1.75);
-      let quality: Quality = phone ? "medium" : "high";
+      const ladder = LADDER[phone ? "phone" : "desktop"];
+      let level = 0;
+      const pixelRatio = () => {
+        const fit = Math.max(1, Math.sqrt(PIXELS[phone ? "phone" : "desktop"] / (window.innerWidth * window.innerHeight)));
+        return Math.max(0.5, Math.min(window.devicePixelRatio || 1, phone ? 1.5 : 2, fit) * ladder[level].scale);
+      };
 
       renderer = new THREE.WebGLRenderer({ antialias: false, alpha: false, powerPreference: "high-performance", stencil: false });
-      renderer.setPixelRatio(pr);
+      renderer.setPixelRatio(pixelRatio());
       renderer.domElement.setAttribute("aria-hidden", "true");
       el.appendChild(renderer.domElement);
 
       performance.mark("q:maps-start");
-      const maps = await texMod.loadMaps(THREE, renderer.capabilities.getMaxAnisotropy(), (done, total) => stage.set({ progress: done / total }));
+      // 8× anisotropic filtering looks the same as 16× on these finishes, for less bandwidth
+      const maps = await texMod.loadMaps(THREE, Math.min(8, renderer.capabilities.getMaxAnisotropy()), (done, total) => stage.set({ progress: done / total }));
       performance.mark("q:maps-end");
       if (disposed) return;
       await document.fonts.ready;
       const font = getComputedStyle(document.documentElement).getPropertyValue("--font-display").trim() || "Georgia, serif";
-      watch = sceneMod.createWatchScene(THREE, renderer, { maps, font, quality });
+      watch = sceneMod.createWatchScene(THREE, renderer, { maps, font, quality: ladder[0] });
       watch.applyBuild(buildStore.get());
       cleanups.push(buildStore.subscribe(() => watch?.applyBuild(buildStore.get())));
 
       const choreo = createChoreo();
       const size = () => {
+        const pr = pixelRatio();
         renderer!.setPixelRatio(pr);
         renderer!.setSize(window.innerWidth, window.innerHeight);
         watch!.resize(window.innerWidth, window.innerHeight, pr);
@@ -82,43 +109,28 @@ export function Stage() {
       performance.mark("q:compile-end");
       if (disposed) return;
 
+      const governor = createGovernor(ladder.length, (l) => {
+        level = l;
+        watch!.setQuality(ladder[l]);
+        size();
+        document.documentElement.dataset.quality = String(l);
+      });
+      document.documentElement.dataset.quality = "0";
+
       let last = 0;
       let shown = 0;
-      let slow = 0;
-      let fast = 0;
-      let samples = 0;
-      let sum = 0;
-      const tune = (ms: number) => {
-        sum += ms;
-        if (++samples < 60) return;
-        const avg = sum / samples;
-        samples = 0;
-        sum = 0;
-        if (avg > 26) {
-          fast = 0;
-          if (++slow >= 2) {
-            slow = 0;
-            if (pr > 1.0) pr = Math.max(1.0, pr - 0.25);
-            else if (quality === "high") watch!.setQuality((quality = "medium"));
-            else if (pr > 0.75) pr = 0.75;
-            else if (quality === "medium") watch!.setQuality((quality = "low"));
-            size();
-          }
-        } else if (avg < 13 && pr < maxPr) {
-          slow = 0;
-          if (++fast >= 4) {
-            fast = 0;
-            pr = Math.min(maxPr, pr + 0.25);
-            size();
-          }
-        }
-      };
+      let drew = false; // whether the previous frame was rendered, so the interval measures one
 
       const loop = (now: number) => {
         raf = requestAnimationFrame(loop);
-        const dt = last ? Math.min((now - last) / 1000, 0.05) : 1 / 60;
+        const ms = last ? now - last : 0;
+        const dt = last ? Math.min(ms / 1000, 0.05) : 1 / 60;
         last = now;
         const f = stage.get();
+        if (f.held) {
+          drew = false;
+          return;
+        }
         const { input, alpha } = choreo.read({ back: f.showBack, realSpeed: f.realSpeed });
         if (process.env.NODE_ENV !== "production") {
           const pose = (window as { __pose?: Partial<typeof input> }).__pose;
@@ -127,17 +139,19 @@ export function Stage() {
         shown += (alpha - shown) * (1 - Math.exp(-6 * dt));
         if (shown < 0.004 && alpha === 0) {
           el.style.visibility = "hidden";
+          drew = false;
           return;
         }
         el.style.visibility = "visible";
         el.style.opacity = shown.toFixed(3);
-        const t0 = performance.now();
         const beat = watch!.frame(dt, input);
         if (beat && f.sound && alpha > 0.5) tick(Math.floor(performance.now() / 125) % 2 === 0);
-        tune(performance.now() - t0 + dt * 1000 * 0.35);
+        if (drew) governor.sample(ms);
+        drew = true;
       };
       const sync = () => {
         cancelAnimationFrame(raf);
+        drew = false;
         if (!document.hidden) {
           last = 0;
           raf = requestAnimationFrame(loop);
@@ -153,6 +167,7 @@ export function Stage() {
         // dev only: step time and centre the subject, for headless checks
         Object.assign(window, {
           __watch: watch,
+          __level: (n: number) => governor.pin(n),
           __advance: (sec: number) => {
             for (let i = 0; i < sec * 30; i++) {
               const f = stage.get();
